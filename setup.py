@@ -42,7 +42,6 @@ sys.path.insert(0, bin_dir)
 
 # Now we can import some weewx modules
 import weewx
-import weeutil.weeutil
 
 VERSION = weewx.__version__
 
@@ -86,7 +85,7 @@ class weewx_install_lib(install_lib):
     def run(self):
         # Save any existing 'bin' subdirectory:
         if os.path.exists(self.install_dir):
-            bin_savedir = weeutil.weeutil.move_with_timestamp(self.install_dir)
+            bin_savedir = move_with_timestamp(self.install_dir)
             print("Saved bin subdirectory as %s" % bin_savedir)
         else:
             bin_savedir = None
@@ -205,6 +204,24 @@ def find_files(directory, file_excludes=['*.pyc'], dir_excludes=['*/__pycache__'
     return data_files
 
 
+def move_with_timestamp(filepath):
+    """Save a file to a path with a timestamp."""
+    import shutil
+    import time
+    # Sometimes the target has a trailing '/'. This will take care of it:
+    filepath = os.path.normpath(filepath)
+    newpath = filepath + time.strftime(".%Y%m%d%H%M%S")
+    # Check to see if this name already exists
+    if os.path.exists(newpath):
+        # It already exists. Stick a version number on it:
+        version = 1
+        while os.path.exists(newpath + '-' + str(version)):
+            version += 1
+        newpath = newpath + '-' + str(version)
+    shutil.move(filepath, newpath)
+    return newpath
+
+
 def update_and_install_config(install_dir, config_name='weewx.conf',
                               no_prompt=False, dry_run=False):
     import configobj
@@ -304,6 +321,7 @@ if __name__ == "__main__":
           version=VERSION,
           description='The WeeWX weather software system',
           long_description=long_description,
+          long_description_content_type = "text/markdown",
           author='Tom Keffer',
           author_email='tkeffer@gmail.com',
           url='http://www.weewx.com',
@@ -312,20 +330,19 @@ if __name__ == "__main__":
               'Development Status :: 5 - Production/Stable',
               'Intended Audience :: End Users/Desktop',
               'Intended Audience :: Science/Research',
-              'License :: GPLv3',
-              'Operating System :: POSIX :: LINUX',
+              'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+              'Operating System :: POSIX :: Linux',
               'Operating System :: Unix',
-              'Operating System :: MacOS',
               'Programming Language :: Python',
               'Programming Language :: Python :: 2.7',
               'Programming Language :: Python :: 3.5',
               'Programming Language :: Python :: 3.6',
               'Programming Language :: Python :: 3.7',
               'Programming Language :: Python :: 3.8',
-              'Topic:: Scientific / Engineering:: Physics'
+              'Topic :: Scientific/Engineering :: Physics'
           ],
           python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4',
-          requires=[
+          install_requires=[
               'cheetah3(>=3.0)',
               'configobj(>=4.7)',  # Python 3 requires >5.0
               'pillow(>=5.4)',
@@ -334,6 +351,7 @@ if __name__ == "__main__":
               'pyusb(>=1.0)',
               'six(>=1.12)'
           ],
+          setup_requires=['configobj(>=4.7)'],
           packages=find_packages('bin'),
           cmdclass={
               "install": weewx_install,
