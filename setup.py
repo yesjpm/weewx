@@ -35,7 +35,7 @@ if sys.version_info < (2, 7):
 # Find the install bin subdirectory:
 this_file = os.path.join(os.getcwd(), __file__)
 this_dir = os.path.abspath(os.path.dirname(this_file))
-bin_dir = os.path.abspath(os.path.join(this_dir, 'bin'))
+bin_dir = os.path.abspath(os.path.join(this_dir, 'lib'))
 
 # Now that we've found the bin subdirectory, inject it into the path:
 sys.path.insert(0, bin_dir)
@@ -352,14 +352,14 @@ if __name__ == "__main__":
               'six(>=1.12)'
           ],
           setup_requires=['configobj(>=4.7)'],
-          packages=find_packages('bin'),
+          packages=find_packages('lib'),
           cmdclass={
               "install": weewx_install,
               "install_data": weewx_install_data,
               "install_lib": weewx_install_lib,
           },
           platforms=['any'],
-          package_dir={'': 'bin'},
+          package_dir={'': 'lib'},
           py_modules=['daemon'],
           scripts=[
               'bin/wee_config',

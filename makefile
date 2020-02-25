@@ -16,7 +16,7 @@ WEEWX_DOWNLOADS=$(WEEWX_HTMLDIR)/downloads
 WEEWX_STAGING=$(WEEWX_HTMLDIR)/downloads/development_versions
 
 # extract version to be used in package controls and labels
-VERSION=$(shell grep "__version__.*=" bin/weewx/__init__.py | sed -e 's/__version__=//' | sed -e 's/"//g')
+VERSION=$(shell grep "__version__.*=" lib/weewx/__init__.py | sed -e 's/__version__=//' | sed -e 's/"//g')
 # just the major.minor part of the version
 MMVERSION:=$(shell echo "$(VERSION)" | sed -e 's%.[0-9a-z]*$$%%')
 
@@ -82,7 +82,7 @@ check-docs:
 
 # if no suite is specified, find all test suites in the source tree
 ifndef SUITE
-SUITE=`find bin -name "test_*.py"`
+SUITE=`find lib -name "test_*.py"`
 endif
 test:
 	@rm -f $(BLDDIR)/test-results
@@ -90,7 +90,7 @@ test:
 	@for f in $(SUITE); do \
   echo running $$f; \
   echo $$f >> $(BLDDIR)/test-results; \
-  PYTHONPATH="bin:examples" $(PYTHON) $$f >> $(BLDDIR)/test-results 2>&1; \
+  PYTHONPATH="lib:examples" $(PYTHON) $$f >> $(BLDDIR)/test-results 2>&1; \
   echo >> $(BLDDIR)/test-results; \
 done
 	@grep "ERROR:\|FAIL:" $(BLDDIR)/test-results || echo "no failures"
@@ -98,7 +98,7 @@ done
 	@echo "see $(BLDDIR)/test-results for output from the tests"
 
 test-setup:
-	bin/weedb/test/setup_mysql
+	lib/weedb/test/setup_mysql
 
 TESTDIR=/var/tmp/weewx_test
 MYSQLCLEAN="drop database test_weewx;\n\
@@ -158,7 +158,7 @@ upload-readme: readme.txt
 
 # update the version in all relevant places
 VDOCS=readme.htm customizing.htm devnotes.htm hardware.htm usersguide.htm upgrading.htm utilities.htm
-VCONFIGS=weewx.conf bin/weecfg/tests/expected/weewx40_user_expected.conf
+VCONFIGS=weewx.conf lib/weecfg/tests/expected/weewx40_user_expected.conf
 version:
 	for f in $(VDOCS); do \
   sed -e 's/^Version: [0-9].*/Version: $(MMVERSION)/' docs/$$f > docs/$$f.tmp; \
