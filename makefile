@@ -40,7 +40,7 @@ help: info
 	@echo ""
 	@echo "   src-package  create source tarball suitable for distribution"
 	@echo "   deb-package  create .deb package"
-	@echo "   rpm-package  create .rpm package"
+	@echo "   rpm-package  create .rpm package   (OSREL,RPMOS)"
 	@echo ""
 	@echo "     check-deb  check the deb package"
 	@echo "     check-rpm  check the rpm package"
@@ -134,7 +134,7 @@ weewx packages      \n\
 $(DEBPKG)\n\
    for Debian, Ubuntu, Mint, including Raspberry Pi\n\
 \n\
-weewx-$(RPMVER).rhel.$(RPMARCH).rpm\n\
+weewx-$(RPMVER).el.$(RPMARCH).rpm\n\
    for Redhat, CentOS, Fedora\n\
 \n\
 weewx-$(RPMVER).suse.$(RPMARCH).rpm\n\
@@ -189,15 +189,11 @@ ifneq ("$(SIGN)","1")
 DPKG_OPT=-us -uc
 endif
 deb-package: deb-package-python2 deb-package-python3
-	mkdir -p $(DSTDIR)
-	mv $(BLDDIR)/$(DEBPKG) $(DSTDIR)
-	mv $(BLDDIR)/python3-$(DEBPKG) $(DSTDIR)
 
 deb-package-prep: $(DSTDIR)/$(SRCPKG)
 	mkdir -p $(BLDDIR)
-	cp $(DSTDIR)/$(SRCPKG) $(BLDDIR)
-	(cd $(BLDDIR); tar xfz $(SRCPKG))
-	(cd $(BLDDIR); mv $(SRCPKG) weewx_$(VERSION).orig.tar.gz)
+	tar xfz $(DSTDIR)/$(SRCPKG) -C $(BLDDIR)
+	cp -p $(DSTDIR)/$(SRCPKG) $(BLDDIR)/weewx_$(VERSION).orig.tar.gz
 	rm -rf $(DEBBLDDIR)/debian
 	mkdir -m 0755 $(DEBBLDDIR)/debian
 	mkdir -m 0755 $(DEBBLDDIR)/debian/source
@@ -216,11 +212,19 @@ deb-package-prep: $(DSTDIR)/$(SRCPKG)
 
 deb-package-python2: deb-package-prep
 	cp pkg/debian/control $(DEBBLDDIR)/debian
+	rm -rf $(DEBBLDDIR)/debian/weewx*
+	rm -f $(DEBBLDDIR)/debian/files
 	(cd $(DEBBLDDIR); dpkg-buildpackage $(DPKG_OPT))
+	mkdir -p $(DSTDIR)
+	mv $(BLDDIR)/$(DEBPKG) $(DSTDIR)
 
 deb-package-python3: deb-package-prep
 	cp pkg/debian/control.python3 $(DEBBLDDIR)/debian/control
-	(cd $(DEBBLDDIR); WEEWX_PYTHON=3 dpkg-buildpackage $(DPKG_OPT))
+	rm -rf $(DEBBLDDIR)/debian/weewx*
+	rm -f $(DEBBLDDIR)/debian/files
+	(cd $(DEBBLDDIR); DEB_BUILD_OPTIONS=python3 dpkg-buildpackage $(DPKG_OPT))
+	mkdir -p $(DSTDIR)
+	mv $(BLDDIR)/$(DEBPKG) $(DSTDIR)/python3-$(DEBPKG)
 
 # run lintian on the deb package
 check-deb:
@@ -240,8 +244,10 @@ rpm-changelog:
 fi
 
 # use rpmbuild to create the rpm package
+# specify the operating system release target (e.g., 7 for centos7)
+OSREL=7
 RPMARCH=noarch
-RPMOS=$(shell if [ -f /etc/SuSE-release ]; then echo .suse; else echo .rhel; fi)
+RPMOS=$(shell if [ -f /etc/SuSE-release ]; then echo .suse; else echo .el$(OSREL); fi)
 RPMBLDDIR=$(BLDDIR)/weewx-$(RPMVER)$(RPMOS).$(RPMARCH)
 RPMPKG=weewx-$(RPMVER)$(RPMOS).$(RPMARCH).rpm
 rpm-package: $(DSTDIR)/$(SRCPKG)
@@ -255,6 +261,7 @@ rpm-package: $(DSTDIR)/$(SRCPKG)
 	mkdir -p -m 0755 $(RPMBLDDIR)/SRPMS
 	sed -e 's%Version:.*%Version: $(VERSION)%' \
             -e 's%RPMREVISION%$(RPMREVISION)%' \
+            -e 's%OSREL%$(OSREL)%' \
             pkg/weewx.spec.in > $(RPMBLDDIR)/SPECS/weewx.spec
 	cat pkg/changelog.rpm >> $(RPMBLDDIR)/SPECS/weewx.spec
 	cp dist/weewx-$(VERSION).tar.gz $(RPMBLDDIR)/SOURCES
@@ -267,6 +274,14 @@ ifeq ("$(SIGN)","1")
 #	rpm --addsign $(DSTDIR)/weewx-$(RPMVER)$(RPMOS).src.rpm
 endif
 
+redhat-packages: rpm-package-el7 rpm-package-el8
+
+rpm-package-el7:
+	make rpm-package OSREL=7
+
+rpm-package-el8:
+	make rpm-package OSREL=8
+
 # run rpmlint on the redhat package
 check-rpm:
 	rpmlint $(DSTDIR)/$(RPMPKG)
@@ -275,14 +290,14 @@ upload-rpm:
 	scp $(DSTDIR)/$(RPMPKG) $(USER)@$(WEEWX_COM):$(WEEWX_STAGING)
 
 upload-rhel:
-	make upload-rpm RPMOS=.rhel
+	make upload-rpm RPMOS=.el$(OSREL)
 
 upload-suse:
-	make upload-rpm RPMOS=.suse
+	make upload-rpm RPMOS=.suse$(OSREL)
 
 # shortcut to upload all packages from a single machine
 DEB_PKG=weewx_$(DEBVER)_$(DEBARCH).deb
-RHEL_PKG=weewx-$(RPMVER).rhel.$(RPMARCH).rpm
+RHEL_PKG=weewx-$(RPMVER).el.$(RPMARCH).rpm
 SUSE_PKG=weewx-$(RPMVER).suse.$(RPMARCH).rpm
 upload-pkgs:
 	scp $(DSTDIR)/$(DEB_PKG) $(DSTDIR)/$(RHEL_PKG) $(DSTDIR)/$(SUSE_PKG) $(USER)@$(WEEWX_COM):$(WEEWX_STAGING)
@@ -326,3 +341,4 @@ code-summary:
 	@for d in weecfg weedb weeutil weewx; do \
   cloc bin/$$d/tests; \
 done
+
