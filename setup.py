@@ -32,15 +32,15 @@ if sys.version_info < (2, 7):
     print('For earlier versions of Python, use WeeWX V3.9.')
     sys.exit("Python version unsupported.")
 
-# Find the install bin subdirectory:
+# Find the install lib subdirectory:
 this_file = os.path.join(os.getcwd(), __file__)
 this_dir = os.path.abspath(os.path.dirname(this_file))
-bin_dir = os.path.abspath(os.path.join(this_dir, 'lib'))
+lib_dir = os.path.abspath(os.path.join(this_dir, 'lib'))
 
-# Now that we've found the bin subdirectory, inject it into the path:
-sys.path.insert(0, bin_dir)
+# Now that we've found the lib subdirectory, inject it into the path:
+sys.path.insert(0, lib_dir)
 
-# Now we can import some weewx modules
+# Now we can get the weewx version
 import weewx
 
 VERSION = weewx.__version__
@@ -51,23 +51,10 @@ VERSION = weewx.__version__
 # ==============================================================================
 
 class weewx_install(install):
-    """Specialized version of install, which adds a --no-prompt option to
-    the 'install' command."""
-
-    # Add an option for --no-prompt:
-    user_options = install.user_options + [('no-prompt', None, 'Do not prompt for station info')]
-
-    def initialize_options(self, *args, **kwargs):
-        install.initialize_options(self, *args, **kwargs)
-        self.no_prompt = None
-
-    def finalize_options(self):
-        install.finalize_options(self)
-        if self.no_prompt is None:
-            self.no_prompt = False
+    """Specialized version of install, which runs a post-install script"""
 
     def run(self):
-        """Specialized version of run, which runs post-install commmands"""
+        """Specialized version of run, which runs post-install commands"""
         # First run the install.
         install.run(self)
 
@@ -80,37 +67,36 @@ class weewx_install(install):
 # ==============================================================================
 
 class weewx_install_lib(install_lib):
-    """Specialized version of install_lib, which backs up old bin subdirectories."""
+    """Specialized version of install_lib, which saves the user subdirectory."""
 
     def run(self):
-        # Save any existing 'bin' subdirectory:
-        if os.path.exists(self.install_dir):
-            bin_savedir = move_with_timestamp(self.install_dir)
-            print("Saved bin subdirectory as %s" % bin_savedir)
+        # Location of the user subdirectory, if it exists.
+        user_dir = os.path.join(self.install_dir, 'bin/user')
+        if os.path.exists(user_dir):
+            # It exists. Save it under a timestamp
+            user_savedir = move_with_timestamp(user_dir)
         else:
-            bin_savedir = None
+            user_savedir = None
 
-        # Run the superclass's version. This will install all incoming files.
+        # Run the superclass's version. This will install all incoming files, including
+        # a new user subdirectory
         install_lib.run(self)
 
-        # If the bin subdirectory previously existed, and if it included
-        # a 'user' subsubdirectory, then restore it
-        if bin_savedir:
-            user_backupdir = os.path.join(bin_savedir, 'user')
-            if os.path.exists(user_backupdir):
-                user_dir = os.path.join(self.install_dir, 'user')
-                distutils.dir_util.copy_tree(user_backupdir, user_dir)
-                try:
-                    # The file schemas.py is no longer used, and can interfere with schema
-                    # imports. See issue #54.
-                    os.rename(os.path.join(user_dir, 'schemas.py'),
-                              os.path.join(user_dir, 'schemas.py.old'))
-                except OSError:
-                    pass
-                try:
-                    os.remove(os.path.join(user_dir, 'schemas.pyc'))
-                except OSError:
-                    pass
+        # If we set aside an old user subdirectory, restore it
+        if user_savedir:
+            # Copy the saved version over
+            distutils.dir_util.copy_tree(user_savedir, user_dir)
+            try:
+                # The file schemas.py is no longer used, and can interfere with schema
+                # imports. See issue #54.
+                os.rename(os.path.join(user_dir, 'schemas.py'),
+                          os.path.join(user_dir, 'schemas.py.old'))
+            except OSError:
+                pass
+            try:
+                os.remove(os.path.join(user_dir, 'schemas.pyc'))
+            except OSError:
+                pass
 
 
 # ==============================================================================
@@ -161,7 +147,9 @@ class weewx_install_data(install_data):
         install_data.run(self)
 
     def process_config_file(self, f, install_dir, **kwargs):
+        """Process weewx.conf separately"""
 
+        # Location of the incoming weewx.conf file
         install_path = os.path.join(install_dir, os.path.basename(f))
 
         if self.dry_run:
@@ -292,7 +280,7 @@ def update_and_install_config(install_dir, config_name='weewx.conf',
 
         # Save the old config file if it exists:
         if not dry_run and os.path.exists(install_path):
-            backup_path = weeutil.weeutil.move_with_timestamp(install_path)
+            backup_path = move_with_timestamp(install_path)
             print("Saved old configuration file as %s" % backup_path)
         if not dry_run:
             # Now install the temporary file (holding the merged config data)
@@ -343,15 +331,15 @@ if __name__ == "__main__":
           ],
           python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4',
           install_requires=[
-              'cheetah3(>=3.0)',
-              'configobj(>=4.7)',  # Python 3 requires >5.0
-              'pillow(>=5.4)',
-              'pyephem(>=3.7)',
-              'pyserial(>=2.3)',
-              'pyusb(>=1.0)',
-              'six(>=1.12)'
+              'configobj>=4.7',
+              'pillow>=6.2',
+              'pyephem>=3.7',
+              'pyserial>=3.4',
+              'pyusb>=1.0.2',
+              'six>=1'
           ],
-          setup_requires=['configobj(>=4.7)'],
+          extras_requires={':python_version >= "2.7"': ['cheetah>=2.4'],
+                           ':python_version >= "3.5"': ['cheetah3>=3.2,<4.0']},
           packages=find_packages('lib'),
           cmdclass={
               "install": weewx_install,
