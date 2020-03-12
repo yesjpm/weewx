@@ -82,13 +82,11 @@ Extending the WeeWX logwatch script:
 
 
 """
-# TODO. Add wmr300 line 1291 log.info( "During history read, %d loop data packets were ignored" % loop_ignored )
 # TODO. Review cc3000 regexs and report specification
 # TODO. Review wmr200 regexs and report specification
-# TODO. Review wmr300 regexs and report specification
-# TODO. Review ws1 regexs and report specification
 # TODO. Review ws23xx regexs and report specification
 # TODO. Review ws28xx regexs and report specification
+# current to commit 3ec36d68a1b9db8de72e7c7d6e73d6ac32971efc
 
 # Python imports
 from __future__ import absolute_import
@@ -461,22 +459,19 @@ WEEWX_LOGWATCH_CONFIG_DEFAULT = {
                    "weewx\.drivers\.wmr300: dump history",
                    "weewx\.drivers\.wmr300: (Clearing|Reading) records since",
                    "weewx\.drivers\.wmr300: New historical record for",
-                   "weewx\.drivers\.wmr300: History read completed:", # maybe count?
+                   "weewx\.drivers\.wmr300: History read completed:",
                    "weewx\.drivers\.wmr300: History read in progress:"
-                   "weewx\.drivers\.wmr300: skip record ",
-                   "weewx\.drivers\.wmr300: got packet ",
                    "weewx\.drivers\.wmr300: ignored packet type",
-                   "weewx\.drivers\.wmr300: request station status:",
-                   "weewx\.drivers\.wmr300: get history complete:",
-                   "weewx\.drivers\.wmr300: get history in progress:",
-                   "weewx\.drivers\.wmr300: ield delayed for",
-                   "weewx\.drivers\.wmr300: history buffer at",
                    "weewx\.drivers\.wmr300: History read nearly complete:",
+                   "weewx\.drivers\.wmr300: request station status:",
+                   "weewx\.drivers\.wmr300: Yield delayed for",
+                   "weewx\.drivers\.wmr300: history buffer at",
                    "weewx\.drivers\.wmr300: USB Read delayed for",
                    "weewx\.drivers\.wmr300: Loop data packets in heartbeat interval",
                    "weewx\.drivers\.wmr300: raw packet:",
                    "weewx\.drivers\.wmr300: rain=",
                    "weewx\.drivers\.wmr300: converted packet:",
+                   "weewx\.drivers\.wmr300: read: ",
                    "weewx\.drivers\.wmr300: write: ",
                    "weewx\.drivers\.wmr300: flush buffer",
                    "weewx\.drivers\.wmr300: flush: discarded \d+ bytes",
@@ -949,10 +944,8 @@ WEEWX_LOGWATCH_CONFIG_DEFAULT = {
                 }
             },
             'wmr300': {
-                'wmr300_history_fail': "weewx\.drivers\.wmr300: Finish history failed after \d+ tries",
                 'wmr300_history_cleared': "weewx\.drivers\.wmr300: History clear completed in",
-                'wmr300_rain_ctr_dec': "weewx\.drivers\.wmr300: rain counter decrement detected:",
-                'wmr300_poss_missed_rain_event': "weewx\.drivers\.wmr300: possible missed rain event:",
+                'wmr300_no_loop_in_hbeat_interval': "weewx\.drivers\.wmr300: No loop data in heartbeat interval,  restarting",
                 'errors': {
                     'wmr300_comm_attempt_fail': "weewx\.drivers\.wmr300: init_comm: failed attempt \d+ of \d+:",
                     'wmr300_init_history_attempt_fail': "weewx\.drivers\.wmr300: init_history: failed attempt \d+ of \d+:",
@@ -961,15 +954,17 @@ WEEWX_LOGWATCH_CONFIG_DEFAULT = {
                     'wmr300_history_bad_index': "weewx\.drivers\.wmr300: read history failed: bad index:",
                     'wmr300_missing_rec': "weewx\.drivers\.wmr300: missing record: skipped from",
                     'wmr300_bogus_history_rec_index': "weewx\.drivers\.wmr300: Bogus historical record index:",
-                    'wmr300_get_history': "weewx\.drivers\.wmr300: get_history:",
-                    'wmr300_get_history_unex_packet': "get_history: unexpected packet, content:",
+                    'wmr300_get_history_unex_packet': "weewx\.drivers\.wmr300: get_history: unexpected packet, content:",
+                    'wmr300_get_history_decode_error': "weewx\.drivers\.wmr300: get_history: ",
+                    'wmr300_history_loop pkts_ignored': "weewx\.drivers\.wmr300: During history read, \d+ loop data packets were ignored",
                     'wmr300_history_bogus_entries': "weewx\.drivers\.wmr300: During history read, \d+ bogus entries found from",
                     'wmr300_excess_hbeat_delay': "weewx\.drivers\.wmr300: Excessive heartbeat delay: \d+s, restarting",
-                    'wmr300_no_loop_in_hbeat_interval': "weewx\.drivers\.wmr300: No loop data in heartbeat interval,  restarting",
                     'wmr300_genlooppackets': "weewx\.drivers\.wmr300: genLoopPackets: ",
                     'wmr300_rain_counter_at_max': "weewx\.drivers\.wmr300: rain counter at maximum, reset required",
                     'wmr300_rain_counter_warning': "weewx\.drivers\.wmr300: rain counter is above warning level, reset recommended",
                     'wmr300_bad_interval': "weewx\.drivers\.wmr300: ignoring record: bad interval",
+                    'wmr300_rain_ctr_dec': "weewx\.drivers\.wmr300: rain counter decrement detected:",
+                    'wmr300_poss_missed_rain_event': "weewx\.drivers\.wmr300: possible missed rain event:",
                     'wmr300_rel_iface_fail': "weewx\.drivers\.wmr300: Release interface failed:",
                     'wmr300_read': "weewx\.drivers\.wmr300: read: "
                 }
@@ -1292,7 +1287,58 @@ WEEWX_LOGWATCH_CONFIG_DEFAULT = {
                             {'wmr100_bad_usb_report': "Bad USB report received"}
                         ]
                     }
-                }
+                },
+                'wmr300': {
+                    'label': "WMR300",
+                    'items': [
+                        {'wmr300_history_cleared': "History cleared"},
+                        {'wmr300_no_loop_in_hbeat_interval': "No loop data in heartbeat interval"},
+                    ],
+                    'errors': {
+                        'label': "Errors",
+                        'items': [
+                            {'wmr300_comm_attempt_fail': "Failed attempts to initiate communication"},
+                            {'wmr300_init_history_attempt_fail': "Failed attempts to initiate history streaming"},
+                            {'wmr300_fin_history_attempt_fail': "Failed attempt to finish history streaming"},
+                            {'wmr300_history_index_not_set': "Read history skipped - index has not been set"},
+                            {'wmr300_history_bad_index': "Read history failed - bad index"},
+                            {'wmr300_missing_rec': "Missing history record"},
+                            {'wmr300_bogus_history_rec_index': "Bogus history record index"},
+                            {'wmr300_get_history_unex_packet': "Unexpected history packet content"},
+                            {'wmr300_get_history_decode_error': "Get history decode errors"},
+                            {'wmr300_history_loop pkts_ignored': "Loop packets ignored during history read",},
+                            {'wmr300_history_bogus_entries': "Bogus entries found during history read"},
+                            {'wmr300_excess_hbeat_delay': "Excessive heartbeat delay"},
+                            {'wmr300_genlooppackets': "genLoopPackets decode/protocol errors"},
+                            {'wmr300_rain_counter_at_max': "Rain counter reset required"},
+                            {'wmr300_rain_counter_warning': "Rain counter reset recommended"},
+                            {'wmr300_bad_interval': "Ignored records - bad interval"},
+                            {'wmr300_rain_ctr_dec': "Rain counter decrements detected"},
+                            {'wmr300_poss_missed_rain_event': "Possible missed rain events"},
+                            {'wmr300_rel_iface_fail': "Release interface failed"},
+                            {'wmr300_read': "Read USB errors"},
+                        ]
+                    }
+                },
+                'ws1': {
+                    'label': "WS1",
+                    'items': [
+                        {'ws1_readings_max_retries': "Maximum retries to get readings exceeded"},
+                        {'ws1_retry_conn': "Connection retries"},
+                        {'ws1_conn_max_retries': "Maximum tries to connect exceeded"}
+                    ],
+                    'errors': {
+                        'label': "Errors",
+                        'items': [
+                            {'ws1_decode_fail': "Decode failed"},
+                            {'ws1_readings_attempt_fail': "Failed attempts to get readings"},
+                            {'ws1_cannot_create_socket': "Cannot create socket"},
+                            {'ws1_cannot_conn': "Failed attempt connect"},
+                            {'ws1_cannot_close_conn': "Cannot close connection"},
+                            {'ws1_get_data_fail': "Failed to get data"}
+                        ]
+                    }
+                },
             }
         ]
     }
