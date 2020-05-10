@@ -532,10 +532,7 @@ class RESTThread(threading.Thread):
         as a GET. [optional]
         """
         # Data might be a unicode string. Encode it first.
-        if six.text_type:
-            data_bytes = data.encode() if data else None
-        else:
-            data_bytes = data
+        data_bytes = six.ensure_binary(data) if data is not None else None
         _response = urllib.request.urlopen(request, data=data_bytes, timeout=self.timeout)
         return _response
 
@@ -1099,8 +1096,8 @@ class StdCWOP(StdRESTful):
 
 
 class CWOPThread(RESTThread):
-    """Concrete class for threads posting from the archive queue,
-    using the CWOP protocol."""
+    """Concrete class for threads posting from the archive queue, using the CWOP protocol. For
+    details on the protocol, see http://www.wxqa.com/faq.html."""
 
     def __init__(self, q, manager_dict,
                  station, passcode, latitude, longitude, station_type,
@@ -1151,7 +1148,9 @@ class CWOPThread(RESTThread):
                                          skip_upload=skip_upload)
         self.station = station
         self.passcode = passcode
-        self.server_list = server_list
+        # In case we have a single server that would likely appear as a string
+        # not a list
+        self.server_list = weeutil.weeutil.option_as_list(server_list)
         self.latitude = to_float(latitude)
         self.longitude = to_float(longitude)
         self.station_type = station_type
@@ -1246,7 +1245,7 @@ class CWOPThread(RESTThread):
 
         # show the packet in the logs for debug
         if weewx.debug >= 2:
-            log.debug('CWOP: packet: %s', _tnc_packet)
+            log.debug("CWOP: packet: '%s'", _tnc_packet.rstrip('\r\n'))
 
         return _tnc_packet
 
@@ -1273,7 +1272,9 @@ class CWOPThread(RESTThread):
                         # Send the login ...
                         self._send(_sock, login, dbg_msg='login')
                         # ... and then the packet
-                        self._send(_sock, tnc_packet, dbg_msg='packet')
+                        response = self._send(_sock, tnc_packet, dbg_msg='tnc')
+                        if weewx.debug >= 2:
+                            log.debug("%s: Response to packet: '%s'", self.protocol_name, response)
                         return
                     finally:
                         _sock.close()
