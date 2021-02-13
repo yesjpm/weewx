@@ -1,3 +1,26 @@
+* Sat Jan 30 2021 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.4.0-1
+- new upstream release
+* Mon Jan 04 2021 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.3.0-1
+- new upstream release
+* Sat Dec 26 2020 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.3.0b3-1
+- new upstream release
+* Fri Dec 18 2020 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.3.0b2-1
+- new upstream release
+* Mon Dec 14 2020 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.3.0b1-1
+- new upstream release
+* Mon Oct 26 2020 Matthew Wall <mwall@users.sourceforge.net> - 4.2.0-1
+- new upstream release
+* Mon Oct 26 2020 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.2.0b2-1
+- new upstream release
+* Fri Oct 23 2020 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.2.0b1-1
+- new upstream release
+* Mon Oct 19 2020 Thomas Keffer (Author of weewx) <tkeffer@gmail.com> - 4.2.0a1-1
+- new upstream release
+* Sat May 30 2020 Matthew Wall (weewx) <mwall@users.sourceforge.net> - 4.1.1-1
+- new upstream release
+- remove the implicitly-applied dependencies in the redhat rpms
+* Mon May 25 2020 Matthew Wall (weewx) <mwall@users.sourceforge.net> - 4.1.0-1
+- new upstream release
 * Thu Apr 30 2020 Matthew Wall (weewx) <mwall@users.sourceforge.net> - 4.0.0-1
 - new upstream release
 * Thu Apr 09 2020 Matthew Wall (weewx) <mwall@users.sourceforge.net> - 4.0.0b18-2

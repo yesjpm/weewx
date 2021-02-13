@@ -39,7 +39,7 @@ from weeutil.weeutil import timestamp_to_string, option_as_list, to_int, tobool,
 log = logging.getLogger(__name__)
 
 # List of sources we support
-SUPPORTED_SOURCES = ['CSV', 'WU', 'Cumulus', 'WD']
+SUPPORTED_SOURCES = ['CSV', 'WU', 'Cumulus', 'WD', 'WeatherCat']
 
 # Minimum requirements in any explicit or implicit WeeWX field-to-import field
 # map
@@ -157,7 +157,7 @@ class Source(object):
 
         # initialise ignore extreme > 255.0 values for temperature and
         # humidity fields for WD imports
-        self.ignore_extreme_temp_hum = False
+        self.ignore_extr_th = False
 
         self.db_binding_wx = get_binding(config_dict)
         self.dbm = open_manager_with_config(config_dict, self.db_binding_wx,
@@ -181,6 +181,7 @@ class Source(object):
         # Process our command line options
         self.dry_run = options.dry_run
         self.verbose = options.verbose
+        self.no_prompt = options.no_prompt
         self.suppress = options.suppress
 
         # By processing any --date, --from and --to options we need to derive
@@ -906,7 +907,7 @@ class Source(object):
 
                         # check and ignore if required temperature and humidity
                         # values of 255.0 and greater
-                        if self.ignore_extreme_temp_hum \
+                        if self.ignore_extr_th \
                                 and self.map[_field]['units'] in ['degree_C', 'degree_F', 'percent'] \
                                 and _temp >= 255.0:
                             _temp = None
@@ -991,7 +992,10 @@ class Source(object):
                 print("         value setting the relevant 'interval' setting in wee_import config to")
                 print("         this value may give a better result.")
                 while self.interval_ans not in ['y', 'n']:
-                    self.interval_ans = input('Are you sure you want to proceed (y/n)? ')
+                    if self.no_prompt:
+                        self.interval_ans = 'y'
+                    else:
+                        self.interval_ans = input('Are you sure you want to proceed (y/n)? ')
                 if self.interval_ans == 'n':
                     # the user chose to abort, but we may have already
                     # processed some records. So log it then raise a SystemExit()
@@ -1172,8 +1176,11 @@ class Source(object):
                 print("%s records identified for import." % len(records))
             # we do, confirm the user actually wants to save them
             while self.ans not in ['y', 'n'] and not self.dry_run:
-                print("Proceeding will save all imported records in the WeeWX archive.")
-                self.ans = input("Are you sure you want to proceed (y/n)? ")
+                if self.no_prompt:
+                    self.ans = 'y'
+                else:
+                    print("Proceeding will save all imported records in the WeeWX archive.")
+                    self.ans = input("Are you sure you want to proceed (y/n)? ")
             if self.ans == 'y' or self.dry_run:
                 # we are going to save them
                 # reset record counter

@@ -10,11 +10,13 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import logging
+import cmath
 import math
 import time
 
 import weewx.uwxutils
-from weewx.units import CtoK, CtoF, FtoC
+import weewx.units
+from weewx.units import CtoK, CtoF, FtoC, mph_to_knot, kph_to_knot, mps_to_knot
 from weewx.units import INHG_PER_MBAR, METER_PER_FOOT, METER_PER_MILE, MM_PER_INCH
 
 log = logging.getLogger(__name__)
@@ -90,8 +92,8 @@ def windchillF(T_F, V_mph):
     return WcF
 
 
-def windchillC(T_C, V_kph):
-    """Wind chill, metric version.
+def windchillMetric(T_C, V_kph):
+    """Wind chill, metric version, with wind in kph.
     
     T: Temperature in Celsius
     
@@ -110,50 +112,110 @@ def windchillC(T_C, V_kph):
     return FtoC(WcF) if WcF is not None else None
 
 
-def heatindexF(T, R):
+# For backwards compatibility
+windchillC = windchillMetric
+
+
+def windchillMetricWX(T_C, V_mps):
+    """Wind chill, metric version, with wind in mps.
+    
+    T: Temperature in Celsius
+    
+    V: Wind speed in mps
+    
+    Returns wind chill in Celsius"""
+
+    if T_C is None or V_mps is None:
+        return None
+
+    T_F = CtoF(T_C)
+    V_mph = 2.237 * V_mps
+
+    WcF = windchillF(T_F, V_mph)
+
+    return FtoC(WcF) if WcF is not None else None
+
+
+def heatindexF(T, R, algorithm='new'):
     """Calculate heat index.
-    http://www.nws.noaa.gov/om/heat/heat_index.shtml
-    
+
+    The 'new' algorithm uses: https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
+
     T: Temperature in Fahrenheit
-    
+
     R: Relative humidity in percent
-    
+
     Returns heat index in Fahrenheit
-    
-    Examples:
-    
-    >>> print(heatindexF(75.0, 50.0))
-    75.0
-    >>> print("%0.7f" % heatindexF(80.0, 50.0))
-    80.8029049
-    >>> print("%0.7f" % heatindexF(80.0, 95.0))
-    86.3980618
-    >>> print("%0.7f" % heatindexF(90.0, 50.0))
-    94.5969412
-    >>> print("%0.7f" % heatindexF(90.0, 95.0))
-    126.6232036
+
+    Examples (Expected values obtained from https://www.wpc.ncep.noaa.gov/html/heatindex.shtml):
+
+    >>> print("%0.0f" % heatindexF(75.0, 50.0))
+    75
+    >>> print("%0.0f" % heatindexF(80.0, 50.0))
+    81
+    >>> print("%0.0f" % heatindexF(80.0, 95.0))
+    88
+    >>> print("%0.0f" % heatindexF(90.0, 50.0))
+    95
+    >>> print("%0.0f" % heatindexF(90.0, 95.0))
+    127
 
     """
     if T is None or R is None:
         return None
 
-    # Formula only valid for temperatures over 80F:
-    if T < 80.0 or R < 40.0:
-        return T
+    if algorithm == 'new':
+        # Formula only valid for temperatures over 40F:
+        if T <= 40.0:
+            return T
 
-    hi_F = -42.379 + 2.04901523 * T + 10.14333127 * R - 0.22475541 * T * R - 6.83783e-3 * T ** 2 \
-           - 5.481717e-2 * R ** 2 + 1.22874e-3 * T ** 2 * R + 8.5282e-4 * T * R ** 2 \
-           - 1.99e-6 * T ** 2 * R ** 2
-    if hi_F < T:
-        hi_F = T
+        # Use simplified formula
+        hi_F = 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (R * 0.094))
+
+        # Apply full formula if the above, averaged with temperature, is greater than 80F:
+        if (hi_F + T) / 2.0 >= 80.0:
+            hi_F = -42.379 \
+                   + 2.04901523 * T \
+                   + 10.14333127 * R \
+                   - 0.22475541 * T * R \
+                   - 6.83783e-3 * T ** 2 \
+                   - 5.481717e-2 * R ** 2 \
+                   + 1.22874e-3 * T ** 2 * R \
+                   + 8.5282e-4 * T * R ** 2 \
+                   - 1.99e-6 * T ** 2 * R ** 2
+            # Apply an adjustment for low humidities
+            if R < 13 and 80 < T < 112:
+                adjustment = ((13 - R) / 4.0) * math.sqrt((17 - abs(T - 95.)) / 17.0)
+                hi_F -= adjustment
+            # Apply an adjustment for high humidities
+            elif R > 85 and 80 <= T < 87:
+                adjustment = ((R - 85) / 10.0) * ((87 - T) / 5.0)
+                hi_F += adjustment
+    else:
+        # Formula only valid for temperatures 80F or more, and RH 40% or more:
+        if T < 80.0 or R < 40.0:
+            return T
+
+        hi_F = -42.379 \
+               + 2.04901523 * T \
+               + 10.14333127 * R \
+               - 0.22475541 * T * R \
+               - 6.83783e-3 * T ** 2 \
+               - 5.481717e-2 * R ** 2 \
+               + 1.22874e-3 * T ** 2 * R \
+               + 8.5282e-4 * T * R ** 2 \
+               - 1.99e-6 * T ** 2 * R ** 2
+        if hi_F < T:
+            hi_F = T
+
     return hi_F
 
 
-def heatindexC(T_C, R):
+def heatindexC(T_C, R, algorithm='new'):
     if T_C is None or R is None:
         return None
     T_F = CtoF(T_C)
-    hi_F = heatindexF(T_F, R)
+    hi_F = heatindexF(T_F, R, algorithm)
     return FtoC(hi_F)
 
 
@@ -236,18 +298,21 @@ def sealevel_pressure_US(sp_inHg, elev_foot, t_F):
     return slp_inHg
 
 
-def calculate_rain(newtotal, oldtotal):
-    """Calculate the rain differential given two cumulative measurements."""
+def calculate_delta(newtotal, oldtotal, delta_key='rain'):
+    """Calculate the differential given two cumulative measurements."""
     if newtotal is not None and oldtotal is not None:
         if newtotal >= oldtotal:
             delta = newtotal - oldtotal
         else:
-            log.info("Rain counter reset detected: new=%s old=%s", newtotal, oldtotal)
+            log.info("'%s' counter reset detected: new=%s old=%s", delta_key,
+                     newtotal, oldtotal)
             delta = None
     else:
         delta = None
     return delta
 
+# For backwards compatibility:
+calculate_rain = calculate_delta
 
 def solar_rad_Bras(lat, lon, altitude_m, ts=None, nfac=2):
     """Calculate maximum solar radiation using Bras method
@@ -519,32 +584,47 @@ def beaufort(ws_kts):
     """Return the beaufort number given a wind speed in knots"""
     if ws_kts is None:
         return None
-    elif ws_kts < 1:
-        return 0
-    elif ws_kts < 4:
-        return 1
-    elif ws_kts < 7:
-        return 2
-    elif ws_kts < 11:
-        return 3
-    elif ws_kts < 17:
-        return 4
-    elif ws_kts < 22:
-        return 5
-    elif ws_kts < 28:
-        return 6
-    elif ws_kts < 34:
-        return 7
-    elif ws_kts < 41:
-        return 8
-    elif ws_kts < 48:
-        return 9
-    elif ws_kts < 56:
-        return 10
-    elif ws_kts < 64:
-        return 11
-    return 12
+    mag_knts = abs(ws_kts)
+    if mag_knts is None:
+        beaufort_mag = None
+    elif mag_knts < 1:
+        beaufort_mag = 0
+    elif mag_knts < 4:
+        beaufort_mag = 1
+    elif mag_knts < 7:
+        beaufort_mag = 2
+    elif mag_knts < 11:
+        beaufort_mag = 3
+    elif mag_knts < 17:
+        beaufort_mag = 4
+    elif mag_knts < 22:
+        beaufort_mag = 5
+    elif mag_knts < 28:
+        beaufort_mag = 6
+    elif mag_knts < 34:
+        beaufort_mag = 7
+    elif mag_knts < 41:
+        beaufort_mag = 8
+    elif mag_knts < 48:
+        beaufort_mag = 9
+    elif mag_knts < 56:
+        beaufort_mag = 10
+    elif mag_knts < 64:
+        beaufort_mag = 11
+    else:
+        beaufort_mag = 12
 
+    if isinstance(ws_kts, complex):
+        return cmath.rect(beaufort_mag, cmath.phase(ws_kts))
+    else:
+        return beaufort_mag
+
+
+weewx.units.conversionDict['mile_per_hour']['beaufort'] = lambda x : beaufort(mph_to_knot(x))
+weewx.units.conversionDict['knot']['beaufort'] = beaufort
+weewx.units.conversionDict['km_per_hour']['beaufort'] = lambda x: beaufort(kph_to_knot(x))
+weewx.units.conversionDict['meter_per_second']['beaufort'] = lambda x : beaufort(mps_to_knot(x))
+weewx.units.default_unit_format_dict['beaufort'] = "%d"
 
 def equation_of_time(doy):
     """Equation of time in minutes. Plus means sun leads local time.
