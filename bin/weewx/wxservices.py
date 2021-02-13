@@ -84,7 +84,7 @@ class StdWXCalculate(weewx.engine.StdService):
             log.debug("Calculations for archive records: %s", self.archive_calc_dict)
 
         # Get the data binding. Default to 'wx_binding'.
-        data_binding = config_dict.get('StdWXCalculate',
+        data_binding = config_dict.get('StdArchive',
                                        {'data_binding': 'wx_binding'}).get('data_binding',
                                                                            'wx_binding')
 

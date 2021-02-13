@@ -649,7 +649,8 @@ def calc_missing(config_dict, db_binding, options):
                                                               db_binding)
     # get the first and last good timestamps from the archive, these represent
     # our overall bounds for calculating missing derived obs
-    with weewx.manager.Manager.open(manager_dict['database_dict']) as dbmanager:
+    with weewx.manager.Manager.open(manager_dict['database_dict'],
+                                    manager_dict['table_name']) as dbmanager:
         first_ts = dbmanager.firstGoodStamp()
         last_ts = dbmanager.lastGoodStamp()
     # process any command line options that may limit the period over which
