@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 class StdWXCalculate(weewx.engine.StdService):
 
-    def __init__(self, engine, config_dict):
+    def __init__(self, engine, config_dict, binding):
         """Initialize an instance of StdWXCalculate and determine the calculations to be done.
 
         Directives look like:
@@ -83,12 +83,7 @@ class StdWXCalculate(weewx.engine.StdService):
             log.debug("Calculations for LOOP packets: %s", self.loop_calc_dict)
             log.debug("Calculations for archive records: %s", self.archive_calc_dict)
 
-        # Get the data binding. Default to 'wx_binding'.
-        data_binding = config_dict.get('StdArchive',
-                                       {'data_binding': 'wx_binding'}).get('data_binding',
-                                                                           'wx_binding')
-
-        self.db_manager = engine.db_binder.get_manager(data_binding=data_binding, initialize=True)
+        self.db_manager = engine.db_binder.get_manager(data_binding=binding, initialize=True)
 
         # we will process both loop and archive events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)

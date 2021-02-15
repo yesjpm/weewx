@@ -393,6 +393,19 @@ class CalcMissing(DatabaseFix):
 
         self.config_dict = config_dict
 
+        # Get the binding for the archive we are to use. If we received an
+        # explicit binding then use that otherwise use the binding that
+        # StdArchive uses.
+        try:
+            db_binding = calc_missing_config_dict['binding']
+        except KeyError:
+            if 'StdArchive' in config_dict:
+                db_binding = config_dict['StdArchive'].get('data_binding',
+                                                           'wx_binding')
+            else:
+                db_binding = 'wx_binding'
+        self.binding = db_binding
+
     def run(self):
         """Main entry point for calculating missing derived fields.
 
@@ -408,7 +421,7 @@ class CalcMissing(DatabaseFix):
         engine = weewx.engine.DummyEngine(self.config_dict)
         # While the above instantiated an instance of StdWXCalculate, we have no way of
         # retrieving it. So, instantiate another one, then use that to calculate derived types.
-        wxcalculate = weewx.wxservices.StdWXCalculate(engine, self.config_dict)
+        wxcalculate = weewx.wxservices.StdWXCalculate(engine, self.config_dict, self.binding)
 
         # initialise some counters so we know what we have processed
         days_updated = 0
